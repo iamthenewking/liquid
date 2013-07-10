@@ -258,7 +258,7 @@ module Liquid
     end
 
     def apply_operation(input, operand, operation)
-      result = to_number(input).send(operation, to_number(operand))
+      result = to_number(input.to_s).send(operation, to_number(operand))
       result.is_a?(BigDecimal) ? result.to_f : result
     end
   end
