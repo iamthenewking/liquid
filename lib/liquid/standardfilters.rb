@@ -43,8 +43,7 @@ module Liquid
       if input.nil? then return end
       l = length.to_i - truncate_string.length
       l = 0 if l < 0
-      truncated = RUBY_VERSION[0,3] == "1.8" ? input.scan(/./mu)[0...l].to_s : input[0...l]
-      input.length > length.to_i ? truncated + truncate_string : input
+      input.length > length.to_i ? input[0...l] + truncate_string : input
     end
 
     def truncatewords(input, words = 15, truncate_string = "...")
@@ -81,7 +80,7 @@ module Liquid
     # Sort elements of the array
     # provide optional property with which to sort an array of hashes or drops
     def sort(input, property = nil)
-      ary = [input].flatten
+      ary = flatten_if_necessary(input)
       if property.nil?
         ary.sort
       elsif ary.first.respond_to?('[]') and !ary.first[property].nil?
@@ -99,11 +98,14 @@ module Liquid
 
     # map/collect on a given property
     def map(input, property)
-      ary = [input].flatten
-      if ary.first.respond_to?('[]') and !ary.first[property].nil?
-        ary.map {|e| e[property] }
-      elsif ary.first.respond_to?(property)
-        ary.map {|e| e.send(property) }
+      flatten_if_necessary(input).map do |e|
+        e = e.call if e.is_a?(Proc)
+
+        if property == "to_liquid"
+          e
+        elsif e.respond_to?(:[])
+          e[property]
+        end
       end
     end
 
@@ -242,7 +244,23 @@ module Liquid
       apply_operation(input, operand, :%)
     end
 
+    def default(input, default_value = "")
+      is_blank = input.respond_to?(:empty?) ? input.empty? : !input
+      is_blank ? default_value : input
+    end
+
     private
+
+    def flatten_if_necessary(input)
+      ary = if input.is_a?(Array)
+        input.flatten
+      elsif input.is_a?(Enumerable) && !input.is_a?(Hash)
+        input
+      else
+        [input].flatten
+      end
+      ary.map{ |e| e.respond_to?(:to_liquid) ? e.to_liquid : e }
+    end
 
     def to_number(obj)
       case obj
